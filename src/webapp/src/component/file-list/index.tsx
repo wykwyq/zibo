@@ -13,7 +13,9 @@ import {
     // @ts-ignore
     DeleteOutlined,
     // @ts-ignore
-    CloudUploadOutlined
+    CloudUploadOutlined,
+    // @ts-ignore
+    DownloadOutlined
 } from "@ant-design/icons";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Utils from "../../utils/common";
@@ -1254,7 +1256,7 @@ const FileList: React.FC = () => {
         }, {
             title: "操作",
             key: "action",
-            width: 200,
+            width: 300,
             render: (text: any, record: CurrentFolderFile) => (
                 <Space size="small" onClick={(e) => e.stopPropagation()}>
                     <Button
@@ -1277,6 +1279,20 @@ const FileList: React.FC = () => {
                             className="action-btn"
                         >
                             上传
+                        </Button>
+                    )}
+                    {!record.is_folder && isVideoFileName(record.name) && (
+                        <Button
+                            type="link"
+                            size="small"
+                            // @ts-ignore
+                            icon={<DownloadOutlined />}
+                            href={`/api/download/mp4/${encodePath(pathParam ? `${pathParam}/${record.name}` : record.name)}`}
+                            download
+                            title="非 MP4 文件会先无损转换为 MP4"
+                            className="action-btn"
+                        >
+                            MP4下载
                         </Button>
                     )}
                     <Popconfirm

@@ -155,6 +155,7 @@ bins/
 !/API.md
 .idea
 bin/
+obj/
 
 # webapp ignore
 node_modules

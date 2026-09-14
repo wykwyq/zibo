@@ -95,6 +95,7 @@ func initMux(ctx context.Context) *mux.Router {
 	apiRoute.HandleFunc("/lives/{id}/startRecord", startRecordDirect).Methods("POST")   // 直接启动录制（适用于 NotifyOnly 房间）
 	apiRoute.HandleFunc("/lives/{id}/stopRecord", stopRecordDirect).Methods("POST")     // 直接停止录制
 	apiRoute.HandleFunc("/lives/{id}/{action}", parseLiveAction).Methods("GET")          // 通配符路由必须放在最后
+	apiRoute.HandleFunc("/download/mp4/{path:.*}", downloadFileAsMP4).Methods("GET")
 	apiRoute.HandleFunc("/file/{path:.*}", getFileInfo).Methods("GET")
 	apiRoute.HandleFunc("/file/{path:.*}", renameFile).Methods("PUT")
 	apiRoute.HandleFunc("/file/{path:.*}", deleteFile).Methods("DELETE")
