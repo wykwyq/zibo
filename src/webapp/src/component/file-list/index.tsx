@@ -5,6 +5,8 @@ import {
     // @ts-ignore
     FolderOutlined,
     // @ts-ignore
+    FolderOpenOutlined,
+    // @ts-ignore
     FileOutlined,
     // @ts-ignore
     CloseOutlined,
@@ -811,6 +813,15 @@ const FileList: React.FC = () => {
             .catch((err: any) => message.error({ content: "上传失败: " + (err.message || err), key: "upload" }));
     };
 
+    const handleOpenFolder = (record: CurrentFolderFile) => {
+        const fullPath = pathParam ? `${pathParam}/${record.name}` : record.name;
+        api.openVideoFolder(fullPath)
+            .then((rsp: any) => {
+                if (rsp.data !== "OK") message.error(rsp.err_msg || "打开文件夹失败");
+            })
+            .catch((err: any) => message.error("打开文件夹失败: " + (err.message || err)));
+    };
+
     const handleBatchUpload = () => {
         if (selectedRowKeys.length === 0) return;
         const paths = selectedRowKeys.map(key => {
@@ -1256,7 +1267,7 @@ const FileList: React.FC = () => {
         }, {
             title: "操作",
             key: "action",
-            width: 300,
+            width: 390,
             render: (text: any, record: CurrentFolderFile) => (
                 <Space size="small" onClick={(e) => e.stopPropagation()}>
                     <Button
@@ -1279,6 +1290,18 @@ const FileList: React.FC = () => {
                             className="action-btn"
                         >
                             上传
+                        </Button>
+                    )}
+                    {!record.is_folder && isVideoFileName(record.name) && (
+                        <Button
+                            type="link"
+                            size="small"
+                            // @ts-ignore
+                            icon={<FolderOpenOutlined />}
+                            onClick={() => handleOpenFolder(record)}
+                            className="action-btn"
+                        >
+                            打开文件夹
                         </Button>
                     )}
                     {!record.is_folder && isVideoFileName(record.name) && (

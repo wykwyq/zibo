@@ -137,6 +137,11 @@ class API {
         return utils.requestGet(`${BASE_URL}/file/${path}`);
     }
 
+    /** 在本机资源管理器中打开录像所在文件夹 */
+    openVideoFolder(path: string) {
+        return utils.requestPost(`${BASE_URL}/file/open-folder`, { path });
+    }
+
     /**
      * 重命名文件或文件夹
      * @param path 原路径

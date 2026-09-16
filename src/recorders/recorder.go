@@ -528,6 +528,7 @@ func (r *recorder) tryRecord(ctx context.Context) {
 		probeConfig := streamprobe.Config{
 			UpstreamURL: url,
 			Headers:     streamInfo.HeadersForDownloader,
+			ReadIdleTimeout: time.Duration(resolvedConfig.TimeoutInUs) * time.Microsecond,
 			OnProbed: func(info *streamprobe.StreamHeaderInfo) {
 				r.actualStreamInfo.Store(info)
 				r.getLogger().Infof("流探测完成: 编码=%s, 分辨率=%s, 帧率=%.1f, 状态=%s",

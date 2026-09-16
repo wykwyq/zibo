@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -16,11 +18,12 @@ internal static class Program
 
 internal sealed class MainForm : Form
 {
-    private const string ServerUrl = "http://127.0.0.1:8080/";
+    private const string ServerUrl = "http://127.0.0.1:28080/";
     private readonly string _appDirectory = AppContext.BaseDirectory;
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill };
     private readonly NotifyIcon _trayIcon;
     private Process? _backend;
+    private string? _shutdownToken;
     private bool _allowExit;
 
     public MainForm()
@@ -43,7 +46,7 @@ internal sealed class MainForm : Form
         menu.Items.Add("打开界面", null, (_, _) => ShowWindow());
         menu.Items.Add("刷新", null, (_, _) => _webView.Reload());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("退出并停止服务", null, (_, _) => ExitApplication());
+        menu.Items.Add("退出并停止服务", null, async (_, _) => await ExitApplicationAsync());
 
         _trayIcon = new NotifyIcon
         {
@@ -87,7 +90,7 @@ internal sealed class MainForm : Form
                 "Bililive-go",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
-            ExitApplication();
+            await ExitApplicationAsync();
         }
     }
 
@@ -108,6 +111,8 @@ internal sealed class MainForm : Form
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden,
         };
+        _shutdownToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        startInfo.Environment["BILILIVE_DESKTOP_SHUTDOWN_TOKEN"] = _shutdownToken;
         startInfo.ArgumentList.Add("--config");
         startInfo.ArgumentList.Add(configPath);
         startInfo.ArgumentList.Add("--no-launcher");
@@ -115,13 +120,24 @@ internal sealed class MainForm : Form
         _backend = Process.Start(startInfo) ?? throw new InvalidOperationException("后端进程启动失败。");
     }
 
-    private static async Task<bool> IsServerReadyAsync()
+    private async Task<bool> IsServerReadyAsync()
     {
         try
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
-            using var response = await client.GetAsync(ServerUrl);
-            return response.IsSuccessStatusCode;
+            using var response = await client.GetAsync(ServerUrl + "api/info");
+            if (!response.IsSuccessStatusCode)
+            {
+                return false;
+            }
+
+            using var info = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var backendPath = Path.Combine(_appDirectory, "backend", "bililive-go.exe");
+            return info.RootElement.GetProperty("app_name").GetString() == "BiliLive-go"
+                && string.Equals(
+                    Path.GetFullPath(info.RootElement.GetProperty("bgo_exe_path").GetString() ?? ""),
+                    backendPath,
+                    StringComparison.OrdinalIgnoreCase);
         }
         catch
         {
@@ -168,18 +184,38 @@ internal sealed class MainForm : Form
         _trayIcon.ShowBalloonTip(2000, "Bililive-go", "程序正在后台运行，可从托盘菜单退出。", ToolTipIcon.Info);
     }
 
-    private void ExitApplication()
+    private async Task ExitApplicationAsync()
     {
-        _allowExit = true;
-        _trayIcon.Visible = false;
-        _trayIcon.Dispose();
-
-        if (_backend is { HasExited: false })
+        if (_allowExit)
         {
-            _backend.Kill(entireProcessTree: true);
-            _backend.WaitForExit(3000);
+            return;
+        }
+        _allowExit = true;
+
+        if (_backend is { HasExited: false } && _shutdownToken is not null)
+        {
+            try
+            {
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                using var request = new HttpRequestMessage(HttpMethod.Post, ServerUrl + "api/desktop/shutdown");
+                request.Headers.Add("X-Desktop-Shutdown-Token", _shutdownToken);
+                using var response = await client.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                await _backend.WaitForExitAsync(timeout.Token);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(
+                    $"录制服务尚未确认停止，已保留后台进程和录制文件。\n{exception.Message}",
+                    "Bililive-go",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
         }
 
+        _trayIcon.Visible = false;
+        _trayIcon.Dispose();
         Close();
     }
 }

@@ -29,6 +29,7 @@ $targetConfig = Join-Path $outputPath 'config.yml'
 if (-not (Test-Path -LiteralPath $targetConfig)) {
     $config = Get-Content -LiteralPath (Join-Path $repositoryRoot 'config.yml') -Raw
     $config = $config -replace 'out_put_path: \./', 'out_put_path: ./Videos'
+    $config = $config -replace 'bind: :8080', 'bind: 127.0.0.1:28080'
     $config = $config -replace 'convert_to_mp4: false', 'convert_to_mp4: true'
     $config = $config -replace 'is_listening: true', 'is_listening: false'
     Set-Content -LiteralPath $targetConfig -Value $config -Encoding utf8NoBOM

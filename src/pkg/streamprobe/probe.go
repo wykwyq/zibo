@@ -19,7 +19,8 @@ import (
 
 const (
 	// maxProbeTags 探测阶段最多读取的 tag 数量
-	maxProbeTags = 30
+	maxProbeTags           = 30
+	defaultReadIdleTimeout = 60 * time.Second
 )
 
 // Config StreamProbe 配置
@@ -40,6 +41,21 @@ type Config struct {
 
 	// Logger 日志记录器
 	Logger *livelogger.LiveLogger
+
+	// ReadIdleTimeout 上游连续无数据时断开连接，以便录制器重新获取直播流
+	ReadIdleTimeout time.Duration
+}
+
+type idleReadConn struct {
+	net.Conn
+	timeout time.Duration
+}
+
+func (c *idleReadConn) Read(b []byte) (int, error) {
+	if err := c.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
+		return 0, err
+	}
+	return c.Conn.Read(b)
 }
 
 // StreamProbe 直播流探测代理
@@ -137,6 +153,18 @@ func (p *StreamProbe) connectUpstream() error {
 		}).DialContext,
 	}
 	proxy.ApplyDownloadProxyToTransport(transport)
+	readIdleTimeout := p.config.ReadIdleTimeout
+	if readIdleTimeout <= 0 {
+		readIdleTimeout = defaultReadIdleTimeout
+	}
+	dial := transport.DialContext
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		conn, err := dial(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		return &idleReadConn{Conn: conn, timeout: readIdleTimeout}, nil
+	}
 
 	client := &http.Client{
 		Transport: transport,
