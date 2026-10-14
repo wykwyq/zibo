@@ -1518,6 +1518,42 @@ func (m *mockLiveForPreview) UpdateLiveOptionsbyConfig(ctx context.Context, room
 }
 func (m *mockLiveForPreview) GetLogger() *livelogger.LiveLogger { return nil }
 
+type danmakuConfigReloader interface {
+	ReloadDanmaku(ctx context.Context) error
+}
+
+func hasDanmakuConfigUpdate(updates map[string]interface{}) bool {
+	_, enableChanged := updates["danmaku_enable"]
+	_, paramsChanged := updates["danmaku"]
+	return enableChanged || paramsChanged
+}
+
+// reloadActiveDanmaku 将已保存的配置即时应用到匹配的活动录制器，不中断视频录制。
+func reloadActiveDanmaku(ctx context.Context, match func(types.LiveID, live.Live) bool) {
+	inst := instance.GetInstance(ctx)
+	recorderMgr, ok := inst.RecorderManager.(recorders.Manager)
+	if !ok {
+		return
+	}
+	inst.Lives.Range(func(liveID types.LiveID, liveObj live.Live) bool {
+		if !match(liveID, liveObj) || !recorderMgr.HasRecorder(inst.Ctx, liveID) {
+			return true
+		}
+		rec, err := recorderMgr.GetRecorder(inst.Ctx, liveID)
+		if err != nil {
+			return true
+		}
+		reloader, ok := rec.(danmakuConfigReloader)
+		if !ok {
+			return true
+		}
+		if err := reloader.ReloadDanmaku(inst.Ctx); err != nil {
+			liveObj.GetLogger().WithError(err).Warn("应用弹幕录制配置失败")
+		}
+		return true
+	})
+}
+
 // updateConfig 更新配置（支持部分更新）
 func updateConfig(writer http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
@@ -1553,6 +1589,9 @@ func updateConfig(writer http.ResponseWriter, r *http.Request) {
 			ErrMsg: "更新配置失败: " + err.Error(),
 		})
 		return
+	}
+	if hasDanmakuConfigUpdate(updates) {
+		reloadActiveDanmaku(r.Context(), func(types.LiveID, live.Live) bool { return true })
 	}
 
 	writeJSON(writer, commonResp{
@@ -1992,6 +2031,11 @@ func updatePlatformConfig(writer http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if hasDanmakuConfigUpdate(updates) {
+		reloadActiveDanmaku(r.Context(), func(_ types.LiveID, liveObj live.Live) bool {
+			return configs.GetPlatformKeyFromUrl(liveObj.GetRawUrl()) == platformKey
+		})
+	}
 
 	writeJSON(writer, commonResp{
 		Data: "OK",
@@ -2121,6 +2165,11 @@ func updateRoomConfigById(writer http.ResponseWriter, r *http.Request) {
 			ErrMsg: "更新直播间配置失败: " + err.Error(),
 		})
 		return
+	}
+	if hasDanmakuConfigUpdate(updates) {
+		reloadActiveDanmaku(r.Context(), func(id types.LiveID, _ live.Live) bool {
+			return string(id) == liveId
+		})
 	}
 
 	// 如果从 NotifyOnly 切换为普通模式，检查是否正在直播并自动开始录制
@@ -2399,6 +2448,11 @@ func updateRoomConfig(writer http.ResponseWriter, r *http.Request) {
 			ErrMsg: "更新直播间配置失败: " + err.Error(),
 		})
 		return
+	}
+	if hasDanmakuConfigUpdate(updates) {
+		reloadActiveDanmaku(r.Context(), func(_ types.LiveID, liveObj live.Live) bool {
+			return liveObj.GetRawUrl() == decodedUrl
+		})
 	}
 
 	writeJSON(writer, commonResp{

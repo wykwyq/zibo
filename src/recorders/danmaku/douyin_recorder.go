@@ -40,7 +40,9 @@ func (r *DouyinDanmakuRecorder) Start(ctx context.Context) error {
 		return nil
 	}
 
-	r.startAt = time.Now()
+	if r.startAt.IsZero() {
+		r.startAt = time.Now()
+	}
 
 	assWriter, err := NewAssWriter(r.outputFile, r.startAt, r.cfg, "Douyin Danmaku")
 	if err != nil {

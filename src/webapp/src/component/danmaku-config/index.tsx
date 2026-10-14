@@ -110,6 +110,22 @@ const DanmakuParamForm: React.FC<{
     }
   };
 
+  const handleEnableChange = async (checked: boolean) => {
+    form.setFieldValue('danmaku_enable', checked);
+    try {
+      const values = await form.validateFields();
+      await onSave({ ...values, danmaku_enable: checked });
+      message.success(`${label || '弹幕'}录制已${checked ? '开启' : '关闭'}`);
+    } catch (error: any) {
+      form.setFieldValue('danmaku_enable', !checked);
+      if (error?.errorFields) {
+        message.error('表单校验失败，请检查输入项');
+      } else {
+        message.error('保存失败: ' + (error?.message || '未知错误'));
+      }
+    }
+  };
+
   const handleReset = async () => {
     if (isRoom && onReset) {
       // Room: clear override, inherit from global
@@ -136,7 +152,7 @@ const DanmakuParamForm: React.FC<{
     <Form form={form} layout="vertical">
       {showEnable && (
         <Form.Item label="录制弹幕" name="danmaku_enable" valuePropName="checked">
-          <Switch />
+          <Switch loading={loading} onChange={handleEnableChange} />
         </Form.Item>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>

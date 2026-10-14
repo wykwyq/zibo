@@ -41,7 +41,9 @@ func (d *DanmakuRecorder) Start(ctx context.Context) error {
 		return nil
 	}
 
-	d.startAt = time.Now()
+	if d.startAt.IsZero() {
+		d.startAt = time.Now()
+	}
 
 	assWriter, err := NewAssWriter(d.outputFile, d.startAt, d.cfg, "Bilibili Danmaku")
 	if err != nil {

@@ -40,14 +40,15 @@ func (r *DouyuDanmakuRecorder) Start(ctx context.Context) error {
 		return nil
 	}
 
-	startAt := time.Now()
+	if r.startAt.IsZero() {
+		r.startAt = time.Now()
+	}
 
-	assWriter, err := NewAssWriter(r.outputFile, startAt, r.cfg, "Douyu Danmaku")
+	assWriter, err := NewAssWriter(r.outputFile, r.startAt, r.cfg, "Douyu Danmaku")
 	if err != nil {
 		return err
 	}
 	r.assWriter = assWriter
-	r.startAt = startAt
 
 	var onGift func(username, giftName string, num int)
 	if r.cfg.RecordDouyuGift != nil && *r.cfg.RecordDouyuGift {

@@ -33,6 +33,12 @@ type Live struct {
 	btoolsLive btoolsLive
 }
 
+// GetRoomID 返回 bililive-tools 已解析的抖音 web_rid。
+// 短链接路径只是分享码，不能用于连接弹幕 WebSocket。
+func (l *Live) GetRoomID() string {
+	return l.btoolsLive.roomId
+}
+
 func (l *Live) GetInfo() (info *live.Info, err error) {
 	return l.btoolsLive.GetInfo()
 }

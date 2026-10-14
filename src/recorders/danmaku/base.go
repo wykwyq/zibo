@@ -30,6 +30,13 @@ func (b *baseRecorder) OutputFile() string {
 	return b.outputFile
 }
 
+// SetStartAt 设置关联视频的开始时间，保证录制中途启用弹幕时 ASS 时间轴仍与视频对齐。
+func (b *baseRecorder) SetStartAt(startAt time.Time) {
+	b.mu.Lock()
+	b.startAt = startAt
+	b.mu.Unlock()
+}
+
 func (b *baseRecorder) GetCount() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()

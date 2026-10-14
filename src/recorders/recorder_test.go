@@ -22,6 +22,32 @@ import (
 	"github.com/bililive-go/bililive-go/src/types"
 )
 
+type resolvedRoomIDLive struct {
+	live.Live
+	roomID string
+	rawURL string
+}
+
+func (l resolvedRoomIDLive) GetRoomID() string { return l.roomID }
+func (l resolvedRoomIDLive) GetRawUrl() string { return l.rawURL }
+
+func TestExtractDouyinRoomIDPrefersResolvedWebRID(t *testing.T) {
+	l := resolvedRoomIDLive{
+		roomID: "AnanxO822",
+		rawURL: "https://v.douyin.com/DhWHNGVCxYk/",
+	}
+	if got := extractDouyinRoomID(l); got != "AnanxO822" {
+		t.Fatalf("应使用已解析的 web_rid，实际得到 %q", got)
+	}
+}
+
+func TestExtractDouyinRoomIDFallsBackToURLPath(t *testing.T) {
+	l := resolvedRoomIDLive{rawURL: "https://live.douyin.com/123456"}
+	if got := extractDouyinRoomID(l); got != "123456" {
+		t.Fatalf("应回退到 URL 路径，实际得到 %q", got)
+	}
+}
+
 func TestTryRecordStopsWithoutPanicWhenFilenameRenderFails(t *testing.T) {
 	previousConfig := configs.GetCurrentConfig()
 	cfg := configs.NewConfig()
