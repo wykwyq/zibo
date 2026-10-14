@@ -355,11 +355,12 @@ func (s *Server) Close(ctx context.Context) {
 	inst.WaitGroup.Done()
 	// 先关闭所有 SSE 连接，避免 Shutdown 时等待
 	GetSSEHub().Close()
-	ctx2, cancel := context.WithCancel(ctx)
+	// 应用退出时根 context 已被取消，不能继续用它执行 HTTP 优雅关闭。
+	ctx2, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	if err := s.server.Shutdown(ctx2); err != nil {
 		applog.GetLogger().WithError(err).Error("failed to shutdown server")
 	}
-	defer cancel()
 	applog.GetLogger().Infof("Server close")
 }
 

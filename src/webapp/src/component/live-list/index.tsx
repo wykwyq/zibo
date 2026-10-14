@@ -344,6 +344,9 @@ interface Room {
 }
 
 class LiveList extends React.Component<Props, IState> {
+	private listRequestInFlight = false;
+	private listLoadErrorShown = false;
+
     //弹幕批量缓冲（高频场景优化）
     private danmakuBuffer: { [roomId: string]: DanmakuMessage[] } = {};
     private danmakuFlushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -957,7 +960,12 @@ class LiveList extends React.Component<Props, IState> {
      * 加载列表数据
      */
     requestListData() {
-        api.getRoomList()
+        if (this.listRequestInFlight) {
+            return;
+        }
+        this.listRequestInFlight = true;
+
+        this.getRoomListWithRetry()
             .then(function (rsp: any) {
                 if (rsp.length === 0) {
                     return [];
@@ -1005,6 +1013,7 @@ class LiveList extends React.Component<Props, IState> {
                 });
             })
             .then((data: ItemData[]) => {
+                this.listLoadErrorShown = false;
                 const oldListLength = this.state.list.length;
                 this.setState({
                     list: data
@@ -1036,8 +1045,34 @@ class LiveList extends React.Component<Props, IState> {
                 });
             })
             .catch(err => {
-                alert(`加载列表数据失败:\n${err}`);
+                console.error('加载列表数据失败:', err);
+                if (!this.listLoadErrorShown) {
+                    this.listLoadErrorShown = true;
+                    message.warning({
+                        key: 'live-list-load-error',
+                        content: '录制服务暂时不可用，列表会自动重试',
+                        duration: 4,
+                    });
+                }
+            })
+            .finally(() => {
+                this.listRequestInFlight = false;
             });
+    }
+
+    private async getRoomListWithRetry(attempts = 3): Promise<any> {
+        let lastError: unknown;
+        for (let attempt = 0; attempt < attempts; attempt++) {
+            try {
+                return await api.getRoomList();
+            } catch (error) {
+                lastError = error;
+                if (attempt + 1 < attempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+        }
+        throw lastError;
     }
 
     requestCookieData() {

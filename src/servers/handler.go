@@ -716,7 +716,30 @@ func addLives(writer http.ResponseWriter, r *http.Request) {
 	writeJSON(writer, info)
 }
 
+var (
+	douyinShareURLPattern = regexp.MustCompile(`(?i)(https?://)?v\.douyin\.com/[a-z0-9_-]+/?`)
+	embeddedURLPattern    = regexp.MustCompile(`(?i)https?://[^\s<>"'，。；;！!？?]+`)
+)
+
+// normalizeLiveURLInput 从平台分享文案中提取直播链接。
+// 抖音分享口令可能在短链后紧跟“7@5.com”等标记，只保留短链的首段路径。
+func normalizeLiveURLInput(input string) string {
+	input = strings.TrimSpace(input)
+	if match := douyinShareURLPattern.FindString(input); match != "" {
+		if !strings.HasPrefix(strings.ToLower(match), "http://") &&
+			!strings.HasPrefix(strings.ToLower(match), "https://") {
+			match = "https://" + match
+		}
+		return match
+	}
+	if match := embeddedURLPattern.FindString(input); match != "" {
+		return strings.TrimRight(match, `.,:)]}>，。：；！!?？、`)
+	}
+	return input
+}
+
 func addLiveImpl(ctx context.Context, urlStr string, isListen bool, notifyOnly bool, persist bool) (info *live.Info, err error) {
+	urlStr = normalizeLiveURLInput(urlStr)
 	if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
 		urlStr = "https://" + urlStr
 	}
@@ -796,7 +819,7 @@ func batchAddLives(writer http.ResponseWriter, r *http.Request) {
 	validURLs := make([]string, 0, len(req.URLs))
 	for _, u := range req.URLs {
 		if s := strings.TrimSpace(u); s != "" {
-			validURLs = append(validURLs, s)
+			validURLs = append(validURLs, normalizeLiveURLInput(s))
 		}
 	}
 

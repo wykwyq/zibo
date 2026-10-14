@@ -70,3 +70,38 @@ func TestGetPlatformStatsReportsDisabledRateLimit(t *testing.T) {
 		assert.Empty(t, response.Platforms[0].WarningMessage)
 	}
 }
+
+func TestNormalizeLiveURLInput(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "抖音完整分享文案",
+			input: "4- 长按复制此条消息，打开抖音搜索，查看TA的更多作品。 https://v.douyin.com/DhWHNGVCxYk/7@5.com :5pm",
+			want:  "https://v.douyin.com/DhWHNGVCxYk/",
+		},
+		{
+			name:  "不带协议的抖音短链",
+			input: "复制 v.douyin.com/AbC_123/ 后打开抖音",
+			want:  "https://v.douyin.com/AbC_123/",
+		},
+		{
+			name:  "普通分享文案",
+			input: "直播地址：https://live.bilibili.com/12345。欢迎观看",
+			want:  "https://live.bilibili.com/12345",
+		},
+		{
+			name:  "普通网址保持不变",
+			input: "https://www.douyu.com/67890",
+			want:  "https://www.douyu.com/67890",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, normalizeLiveURLInput(tt.input))
+		})
+	}
+}
